@@ -21,6 +21,7 @@ envCandidates.forEach((path, index) => {
 
 const API_KEY = process.env.PEN_ROUTER_API_KEY;
 const MODEL = process.env.PEN_ROUTER_MODEL || 'openrouter/auto';
+const IGNORE_GITIGNORED_FILES = process.env.IGNORE_GITIGNORED_FILES !== 'false';
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 if (!API_KEY) {
@@ -79,7 +80,16 @@ const untracked = statusOutput
   .map((line) => line.replace('?? ', '').trim())
   .filter(Boolean);
 
-const untrackedDiff = untracked
+const gitignored = IGNORE_GITIGNORED_FILES
+  ? []
+  : run('git ls-files -oi --exclude-standard')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+const syntheticFiles = [...new Set([...untracked, ...gitignored])];
+
+const syntheticDiff = syntheticFiles
   .map((file) => {
     try {
       const content = readFileSync(file, 'utf-8');
@@ -97,7 +107,7 @@ const untrackedDiff = untracked
   })
   .join('\n');
 
-const combinedDiff = [diff, untrackedDiff].filter(Boolean).join('\n');
+const combinedDiff = [diff, syntheticDiff].filter(Boolean).join('\n');
 
 if (!combinedDiff) {
   console.log('Não há alterações para resumir.');

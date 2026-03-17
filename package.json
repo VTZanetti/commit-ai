@@ -1,0 +1,28 @@
+{
+  "name": "commitai",
+  "version": "1.0.0",
+  "description": "CLI para gerar commits automáticos com IA via Pen Router",
+  "main": "commit-ai.js",
+  "scripts": {
+    "commit:ai": "node commit-ai.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "commitai": "commit-ai.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VTZanetti/ia-test.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/VTZanetti/ia-test/issues"
+  },
+  "homepage": "https://github.com/VTZanetti/ia-test#readme",
+  "dependencies": {
+    "dotenv": "^17.3.1"
+  }
+}

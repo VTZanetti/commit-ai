@@ -37,6 +37,12 @@ const run = (command) => {
   }
 };
 
+const currentBranch = run('git rev-parse --abbrev-ref HEAD') || 'branch-desconhecida';
+
+const warnBranch = (context) => {
+  console.log(`\n[Alerta] Você está na branch "${currentBranch}" antes de ${context}.`);
+};
+
 const rl = readline.createInterface({ input: stdin, output: stdout });
 
 const askYesNo = async (question) => {
@@ -155,6 +161,8 @@ if (!combinedDiff) {
   console.log('\nSugestão de commit:');
   console.log(message);
 
+  warnBranch('commitar');
+
   const shouldCommit = await askYesNo('Deseja aplicar esta mensagem e commitar?');
   if (!shouldCommit) {
     console.log('Nenhum commit realizado.');
@@ -164,6 +172,8 @@ if (!combinedDiff) {
 
   stageAll();
   commitWithMessage(message);
+
+  warnBranch('executar git push');
 
   const shouldPush = await askYesNo('Commit criado. Deseja executar git push agora?');
   if (shouldPush) {

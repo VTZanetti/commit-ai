@@ -1,0 +1,26 @@
+{
+  "name": "ia-test",
+  "version": "1.0.0",
+  "description": "Terminal CLI para conversar com IA via Pen Router",
+  "main": "chat.js",
+  "scripts": {
+    "start": "node chat.js",
+    "commit:ai": "node commit-ai.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VTZanetti/ia-test.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/VTZanetti/ia-test/issues"
+  },
+  "homepage": "https://github.com/VTZanetti/ia-test#readme",
+  "dependencies": {
+    "dotenv": "^17.3.1"
+  }
+}

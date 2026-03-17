@@ -1,13 +1,23 @@
 #!/usr/bin/env node
 const { execSync } = require('node:child_process');
-const { readFileSync, writeFileSync, unlinkSync } = require('node:fs');
+const { existsSync, readFileSync, writeFileSync, unlinkSync } = require('node:fs');
 const readline = require('node:readline/promises');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { exit, stdin, stdout } = require('node:process');
 const { config } = require('dotenv');
 
-config();
+const envCandidates = [
+  join(__dirname, '.env'),
+  join(process.cwd(), '.env'),
+  process.env.PEN_ROUTER_ENV_PATH,
+].filter(Boolean);
+
+envCandidates.forEach((path, index) => {
+  if (existsSync(path)) {
+    config({ path, override: index !== 0 });
+  }
+});
 
 const API_KEY = process.env.PEN_ROUTER_API_KEY;
 const MODEL = process.env.PEN_ROUTER_MODEL || 'openrouter/auto';

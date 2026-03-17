@@ -1,12 +1,14 @@
 {
-  "name": "ia-test",
+  "name": "commitai",
   "version": "1.0.0",
-  "description": "Terminal CLI para conversar com IA via Pen Router",
-  "main": "chat.js",
+  "description": "CLI para gerar commits automáticos com IA via Pen Router",
+  "main": "commit-ai.js",
   "scripts": {
-    "start": "node chat.js",
     "commit:ai": "node commit-ai.js",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "commitai": "commit-ai.js"
   },
   "repository": {
     "type": "git",

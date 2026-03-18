@@ -20,7 +20,7 @@ CLI para gerar mensagens de commit com IA (formato conventional commits) e aplic
 
 ## Pré-requisitos
 - Node.js 18 ou superior.
-- Conta e API key do Pen Router (`PEN_ROUTER_API_KEY`).
+- Conta e API key do Open Router (`OPEN_ROUTER_API_KEY`).
 
 ## Instalação
 
@@ -35,15 +35,15 @@ npm install
 Crie um arquivo `.env` na raiz do repositório com:
 
 ```
-PEN_ROUTER_API_KEY=coloque_sua_chave_aqui
-PEN_ROUTER_MODEL=openrouter/auto
+OPEN_ROUTER_API_KEY=coloque_sua_chave_aqui
+OPEN_ROUTER_MODEL=openrouter/auto
 ```
 
 ### Prioridade de carregamento
 O `commit-ai.js` procura as variáveis nesta ordem:
 1. `.env` localizado junto ao CLI (`/path/do/cli/.env`).
 2. `.env` do diretório em que o comando é executado.
-3. Caminho apontado em `PEN_ROUTER_ENV_PATH` (valor absoluto).
+3. Caminho apontado em `OPEN_ROUTER_ENV_PATH` (valor absoluto).
 
 Use essa hierarquia para reutilizar a mesma chave em vários projetos sem duplicar arquivos.
 

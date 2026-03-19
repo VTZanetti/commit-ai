@@ -58,7 +58,7 @@ const OPEN_ROUTER_KEY = process.env.OPEN_ROUTER_API_KEY;
 const ANTIGRAVITY_REFRESH_TOKEN = process.env.ANTIGRAVITY_REFRESH_TOKEN;
 const ANTIGRAVITY_PROJECT_ID = process.env.ANTIGRAVITY_PROJECT_ID;
 
-const MODEL = process.env.OPEN_ROUTER_MODEL || (MODE === 'antigravity' ? 'claude-sonnet-4-6-thinking' : 'openrouter/auto');
+const MODEL = process.env.OPEN_ROUTER_MODEL || (MODE === 'antigravity' ? 'gemini-2.5-flash-lite' : 'openrouter/auto');
 const IGNORE_GITIGNORED_FILES = process.env.IGNORE_GITIGNORED_FILES !== 'false';
 const MAX_FILE_CHARS = parseInt(process.env.MAX_FILE_CHARS || '2000', 10);
 const MAX_TOTAL_FILES = parseInt(process.env.MAX_TOTAL_FILES || '50', 10);
@@ -412,35 +412,48 @@ Diff:\n${diffContent}`;
       return data.choices?.[0]?.message?.content?.trim();
     } else {
       const tokens = await refreshAccessToken(finalRefreshToken);
-      const payload = {
-        project: finalProjectId,
-        model: MODEL,
-        request: {
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          systemInstruction: { role: 'user', parts: [{ text: 'Você é um especialista em gerar mensagens de commit seguindo o padrão brasileiro com emojis. Sempre use o emoji correto para cada tipo de commit. Seja preciso e objetivo.' }] }
-        },
-        userAgent: 'antigravity',
-        requestType: 'agent',
-        requestId: 'agent-' + crypto.randomUUID()
+      const generate = async (modelId) => {
+        const payload = {
+          project: finalProjectId,
+          model: modelId,
+          request: {
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            systemInstruction: { role: 'user', parts: [{ text: 'Você é um especialista em gerar mensagens de commit seguindo o padrão brasileiro com emojis. Sempre use o emoji correto para cada tipo de commit. Seja preciso e objetivo.' }] }
+          },
+          userAgent: 'antigravity',
+          requestType: 'agent',
+          requestId: 'agent-' + crypto.randomUUID()
+        };
+        const resp = await fetch(`${ANTIGRAVITY_ENDPOINTS[1]}/v1internal:streamGenerateContent`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${tokens.access_token}`,
+            'Content-Type': 'application/json',
+            ...ANTIGRAVITY_HEADERS
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) throw new Error(`Erro Antigravity: ${resp.status} ${await resp.text()}`);
+        
+        const text = await resp.text();
+        const matches = text.match(/"text":\s*"([^"]+)"/g);
+        if (matches) {
+          return matches.map(m => m.match(/"text":\s*"([^"]+)"/)[1].replace(/\\n/g, '\n')).join('').trim();
+        }
+        return null;
       };
-      const resp = await fetch(`${ANTIGRAVITY_ENDPOINTS[1]}/v1internal:streamGenerateContent`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokens.access_token}`,
-          'Content-Type': 'application/json',
-          ...ANTIGRAVITY_HEADERS
-        },
-        body: JSON.stringify(payload)
-      });
-      if (!resp.ok) throw new Error(`Erro Antigravity: ${resp.status} ${await resp.text()}`);
-      
-      const text = await resp.text();
-      // Simple parsing for streaming JSON chunks (rough implementation)
-      const matches = text.match(/"text":\s*"([^"]+)"/g);
-      if (matches) {
-        return matches.map(m => m.match(/"text":\s*"([^"]+)"/)[1].replace(/\\n/g, '\n')).join('').trim();
+
+      try {
+        let res = await generate(MODEL);
+        if (!res) throw new Error('Empty response');
+        return res;
+      } catch (e) {
+        if (MODEL === 'gemini-2.5-flash-lite') {
+          console.log('\n[Aviso] gemini-2.5-flash-lite falhou, tentando gemini-3-flash...');
+          return await generate('gemini-3-flash');
+        }
+        throw e;
       }
-      return 'Erro ao processar resposta do Antigravity.';
     }
   };
 

@@ -58,7 +58,7 @@ const OPEN_ROUTER_KEY = process.env.OPEN_ROUTER_API_KEY;
 const ANTIGRAVITY_REFRESH_TOKEN = process.env.ANTIGRAVITY_REFRESH_TOKEN;
 const ANTIGRAVITY_PROJECT_ID = process.env.ANTIGRAVITY_PROJECT_ID;
 
-const MODEL = process.env.OPEN_ROUTER_MODEL || (MODE === 'antigravity' ? 'gemini-2.5-flash-lite' : 'openrouter/auto');
+let MODEL = process.env.OPEN_ROUTER_MODEL || (MODE === 'antigravity' ? 'gemini-3-flash' : 'openrouter/auto');
 const IGNORE_GITIGNORED_FILES = process.env.IGNORE_GITIGNORED_FILES !== 'false';
 const MAX_FILE_CHARS = parseInt(process.env.MAX_FILE_CHARS || '2000', 10);
 const MAX_TOTAL_FILES = parseInt(process.env.MAX_TOTAL_FILES || '50', 10);
@@ -317,6 +317,9 @@ if (MAX_DIFF_SIZE > 0 && combinedDiff.length > MAX_DIFF_SIZE) {
     const choice = await rl.question('Selecione (1 ou 2): ');
     currentMode = choice === '2' ? 'antigravity' : 'openrouter';
     saveEnv('COMMIT_AI_MODE', currentMode);
+    if (!process.env.OPEN_ROUTER_MODEL) {
+      MODEL = currentMode === 'antigravity' ? 'gemini-3-flash' : 'openrouter/auto';
+    }
   }
 
   let finalApiKey = OPEN_ROUTER_KEY;
@@ -424,23 +427,36 @@ Diff:\n${diffContent}`;
           requestType: 'agent',
           requestId: 'agent-' + crypto.randomUUID()
         };
-        const resp = await fetch(`${ANTIGRAVITY_ENDPOINTS[1]}/v1internal:streamGenerateContent`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${tokens.access_token}`,
-            'Content-Type': 'application/json',
-            ...ANTIGRAVITY_HEADERS
-          },
-          body: JSON.stringify(payload)
-        });
-        if (!resp.ok) throw new Error(`Erro Antigravity: ${resp.status} ${await resp.text()}`);
-        
-        const text = await resp.text();
-        const matches = text.match(/"text":\s*"([^"]+)"/g);
-        if (matches) {
-          return matches.map(m => m.match(/"text":\s*"([^"]+)"/)[1].replace(/\\n/g, '\n')).join('').trim();
+
+        let lastError = null;
+        for (const endpoint of ANTIGRAVITY_ENDPOINTS) {
+          try {
+            const resp = await fetch(`${endpoint}/v1internal:streamGenerateContent?alt=sse`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${tokens.access_token}`,
+                'Content-Type': 'application/json',
+                ...ANTIGRAVITY_HEADERS
+              },
+              body: JSON.stringify(payload)
+            });
+            
+            if (!resp.ok) {
+              lastError = new Error(`Erro Antigravity em ${endpoint}: ${resp.status} ${await resp.text()}`);
+              continue;
+            }
+            
+            const text = await resp.text();
+            const matches = text.match(/"text":\s*"([^"]+)"/g);
+            if (matches) {
+              return matches.map(m => m.match(/"text":\s*"([^"]+)"/)[1].replace(/\\n/g, '\n')).join('').trim();
+            }
+            return null;
+          } catch (e) {
+            lastError = e;
+          }
         }
-        return null;
+        throw lastError || new Error('Falha ao gerar conteúdo em todos os endpoints');
       };
 
       try {
@@ -448,8 +464,8 @@ Diff:\n${diffContent}`;
         if (!res) throw new Error('Empty response');
         return res;
       } catch (e) {
-        if (MODEL === 'gemini-2.5-flash-lite') {
-          console.log('\n[Aviso] gemini-2.5-flash-lite falhou, tentando gemini-3-flash...');
+        if (MODEL !== 'gemini-3-flash') {
+          console.log(`\n[Aviso] ${MODEL} falhou, tentando gemini-3-flash...`);
           return await generate('gemini-3-flash');
         }
         throw e;

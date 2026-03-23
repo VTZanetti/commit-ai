@@ -14,15 +14,13 @@ CLI para gerar mensagens de commit com IA (formato conventional commits) e aplic
 - [Licença](#licença)
 
 ## Recursos
-- Suporte a múltiplos provedores: **OpenRouter** (via API Key) e **Antigravity** (via Login Google).
-- Seleção automática de provedor no primeiro uso.
 - Commit writer detecta arquivos staged, unstaged e untracked.
 - Suporte a confirmação para `git commit` e `git push`.
 - CLI exportado via campo `bin` para ser executado em qualquer projeto com Git.
 
 ## Pré-requisitos
 - Node.js 18 ou superior.
-- Uma conta Google (para modo Antigravity) ou API key do Open Router (modo OpenRouter).
+- Conta e API key do Open Router (`OPEN_ROUTER_API_KEY`).
 
 ## Instalação
 
@@ -34,13 +32,11 @@ npm install
 
 ## Configuração das variáveis de ambiente
 
-O script gerencia as configurações automaticamente no primeiro uso, salvando no arquivo `.env`. No entanto, você pode configurar manualmente:
+Crie um arquivo `.env` na raiz do repositório com:
 
 ```
-COMMIT_AI_MODE=antigravity # ou openrouter
-OPEN_ROUTER_API_KEY=sua_chave_aqui
-ANTIGRAVITY_REFRESH_TOKEN=seu_token_aqui
-ANTIGRAVITY_PROJECT_ID=seu_projeto_aqui
+OPEN_ROUTER_API_KEY=coloque_sua_chave_aqui
+OPEN_ROUTER_MODEL=openrouter/auto
 ```
 
 ### Prioridade de carregamento
@@ -58,9 +54,10 @@ npm run commit:ai
 ```
 
 Fluxo:
-1. No primeiro uso, selecione entre OpenRouter e Antigravity (Google).
-2. O script agrega `git diff --cached`, `git diff` e gera diffs sintéticos para arquivos `??` do `git status --short`.
-3. A IA devolve uma mensagem de commit no formato convencional.
+1. O script agrega `git diff --cached`, `git diff` e gera diffs sintéticos para arquivos `??` do `git status --short`.
+2. A IA devolve uma mensagem de commit no formato:
+   - Linha 1: `tipo(escopo): resumo`
+   - Linha 3+: até 3 bullets explicando mudanças.
 3. Você confirma se deseja aplicar a mensagem. Caso aceite:
    - Executa `git add -A`.
    - Cria o commit com a mensagem sugerida.

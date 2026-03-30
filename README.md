@@ -17,6 +17,33 @@ CLI para gerar mensagens de commit com IA (formato conventional commits) e aplic
 - Commit writer detecta arquivos staged, unstaged e untracked.
 - Suporte a confirmação para `git commit` e `git push`.
 - CLI exportado via campo `bin` para ser executado em qualquer projeto com Git.
+- **Processamento em 2 etapas** otimizado para APIs gratuitas com limite de tokens.
+
+### Processamento em 2 etapas (otimizado para APIs gratuitas)
+
+Quando `USE_TWO_STEP_PROCESSING=true` (padrão), o commit-ai usa uma estratégia inteligente:
+
+**Etapa 1**: Resumir cada arquivo individualmente
+- Processa cada arquivo modificado separadamente
+- Gera um resumo curto de 1-2 linhas por arquivo
+- Reduz drasticamente o consumo de tokens por requisição
+- Ideal para APIs gratuitas com limites baixos
+
+**Etapa 2**: Combinar resumos
+- Pega todos os resumos individuais
+- Gera a mensagem de commit final baseada nos resumos
+- Mantém a qualidade mesmo com muitos arquivos
+
+**Benefícios**:
+- ✅ Consome menos tokens por requisição (várias pequenas vs uma grande)
+- ✅ Funciona bem com limites de APIs gratuitas
+- ✅ Mais resiliente: se um arquivo falhar, os outros continuam
+- ✅ Progresso visível durante o processamento
+
+**Modo tradicional** (`USE_TWO_STEP_PROCESSING=false`):
+- Envia todos os diffs de uma vez
+- Mais rápido, mas pode ultrapassar limites de tokens
+- Recomendado apenas para APIs pagas sem limites
 
 ## Pré-requisitos
 - Node.js 18 ou superior.
@@ -37,7 +64,26 @@ Crie um arquivo `.env` na raiz do repositório com:
 ```
 OPEN_ROUTER_API_KEY=coloque_sua_chave_aqui
 OPEN_ROUTER_MODEL=openrouter/auto
+
+# Otimização para APIs gratuitas com limite de tokens
+USE_TWO_STEP_PROCESSING=true
+MAX_CHUNK_SIZE=8000
+MAX_FILE_CHARS=2000
+MAX_TOTAL_FILES=50
+MAX_DIFF_SIZE=100000
 ```
+
+### Variáveis disponíveis
+
+- **OPEN_ROUTER_API_KEY** (obrigatório): Sua chave de API do Open Router
+- **OPEN_ROUTER_MODEL** (padrão: `openrouter/auto`): Modelo de IA a ser usado
+- **USE_TWO_STEP_PROCESSING** (padrão: `true`): Ativa processamento em 2 etapas
+  - `true`: Processa cada arquivo individualmente primeiro, depois combina (ideal para IAs gratuitas)
+  - `false`: Envia todos os diffs de uma vez (mais rápido, mas consome mais tokens)
+- **MAX_CHUNK_SIZE** (padrão: `8000`): Máximo de caracteres por arquivo ao resumir
+- **MAX_FILE_CHARS** (padrão: `2000`): Máximo de caracteres por arquivo novo
+- **MAX_TOTAL_FILES** (padrão: `50`): Máximo de arquivos novos a processar
+- **MAX_DIFF_SIZE** (padrão: `100000`): Tamanho máximo do diff total
 
 ### Prioridade de carregamento
 O `commit-ai.js` procura as variáveis nesta ordem:

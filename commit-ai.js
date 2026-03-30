@@ -25,6 +25,8 @@ const IGNORE_GITIGNORED_FILES = process.env.IGNORE_GITIGNORED_FILES !== 'false';
 const MAX_FILE_CHARS = parseInt(process.env.MAX_FILE_CHARS || '2000', 10);
 const MAX_TOTAL_FILES = parseInt(process.env.MAX_TOTAL_FILES || '50', 10);
 const MAX_DIFF_SIZE = parseInt(process.env.MAX_DIFF_SIZE || '100000', 10);
+const USE_TWO_STEP_PROCESSING = process.env.USE_TWO_STEP_PROCESSING !== 'false';
+const MAX_CHUNK_SIZE = parseInt(process.env.MAX_CHUNK_SIZE || '8000', 10);
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 if (!API_KEY) {
@@ -163,7 +165,143 @@ if (MAX_DIFF_SIZE > 0 && combinedDiff.length > MAX_DIFF_SIZE) {
   console.log(`\n[Aviso] Diff muito grande (${originalSize} caracteres). Truncado para ${MAX_DIFF_SIZE} caracteres.`);
 }
 
-(async () => {
+const callAI = async (systemPrompt, userPrompt, temperature = 0.1) => {
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${API_KEY}`,
+      'HTTP-Referer': 'http://localhost',
+      'X-Title': 'CLI Commit Writer',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erro ao consultar IA: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  const message = data.choices?.[0]?.message?.content?.trim();
+
+  if (!message) {
+    throw new Error('Resposta vazia do modelo.');
+  }
+
+  return message;
+};
+
+const splitDiffByFile = (diffText) => {
+  const files = [];
+  const lines = diffText.split('\n');
+  let currentFile = null;
+  let currentContent = [];
+
+  for (const line of lines) {
+    if (line.startsWith('diff --git')) {
+      if (currentFile) {
+        files.push({
+          path: currentFile,
+          diff: currentContent.join('\n'),
+        });
+      }
+      const match = line.match(/diff --git a\/(.*) b\//);
+      currentFile = match ? match[1] : 'arquivo-desconhecido';
+      currentContent = [line];
+    } else if (currentFile) {
+      currentContent.push(line);
+    }
+  }
+
+  if (currentFile) {
+    files.push({
+      path: currentFile,
+      diff: currentContent.join('\n'),
+    });
+  }
+
+  return files;
+};
+
+const summarizeFileDiff = async (filePath, fileDiff) => {
+  const systemPrompt = 'Você é um especialista em análise de código. Sua tarefa é resumir brevemente as mudanças em um arquivo.';
+  
+  const userPrompt = `Resuma as mudanças no arquivo "${filePath}" em 1-2 linhas curtas e objetivas em português:\n\n${fileDiff.substring(0, MAX_CHUNK_SIZE)}`;
+
+  try {
+    return await callAI(systemPrompt, userPrompt, 0.1);
+  } catch (error) {
+    console.error(`[Aviso] Erro ao resumir ${filePath}: ${error.message}`);
+    return `${filePath}: mudanças detectadas (erro ao processar)`;
+  }
+};
+
+const processTwoStep = async (diffText) => {
+  console.log('\n[Processamento em 2 etapas para otimizar tokens]');
+  
+  const files = splitDiffByFile(diffText);
+  console.log(`[Etapa 1/2] Resumindo ${files.length} arquivo(s) individualmente...`);
+  
+  const summaries = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    process.stdout.write(`\r  Processando ${i + 1}/${files.length}: ${file.path}...`);
+    const summary = await summarizeFileDiff(file.path, file.diff);
+    summaries.push(`- ${file.path}: ${summary}`);
+  }
+  process.stdout.write('\n');
+  
+  console.log('[Etapa 2/2] Gerando mensagem de commit final com base nos resumos...');
+  
+  const combinedSummary = summaries.join('\n');
+  
+  const systemPrompt = 'Você é um especialista em gerar mensagens de commit seguindo o padrão brasileiro com emojis. Sempre use o emoji correto para cada tipo de commit. Seja preciso e objetivo.';
+  
+  const userPrompt = `Com base nos seguintes resumos de mudanças, gere uma mensagem de commit seguindo o padrão brasileiro de commits:
+
+FORMATO:
+emoji <tipo>(escopo): resumo curto (máx. 72 caracteres)
+
+corpo com bullets descrevendo o que mudou
+
+TIPOS E EMOJIS:
+- ✨ feat - novo recurso
+- 🐛 fix - correção de bug
+- 📚 docs - mudanças na documentação
+- 💄 style - formatação, semicolons, lint (sem alteração de código)
+- ♻️ refactor - refatoração sem alterar funcionalidade
+- 🔧 build - modificações em build e dependências
+- 🧪 test - alterações em testes
+- 🔧 chore - tarefas de build, configurações, pacotes
+- ✅ test - adicionando um teste
+- 📦 build - package.json
+- 🚧 wip - em progresso
+- ➕ chore - adicionando dependência
+- ➖ chore - removendo dependência
+- 🚚 refactor - mover/renomear
+
+INSTRUÇÕES:
+1. Use SEMPRE o emoji correspondente ao tipo
+2. Primeira linha: emoji + tipo(escopo): resumo curto
+3. Linha em branco
+4. Corpo com 1-3 bullets começando com "- "
+5. Tudo em português
+6. Não invente mudanças que não estejam nos resumos
+
+Resumos das mudanças:
+${combinedSummary}`;
+  
+  return await callAI(systemPrompt, userPrompt, 0.1);
+};
+
+const processSingleStep = async (diffText) => {
   const prompt = `A partir do diff abaixo, gere uma mensagem de commit seguindo o padrão brasileiro de commits:
 
 FORMATO:
@@ -195,40 +333,24 @@ INSTRUÇÕES:
 5. Tudo em português
 6. Não invente mudanças que não estejam no diff
 
-Diff:\n${combinedDiff}`;
+Diff:\n${diffText}`;
 
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${API_KEY}`,
-      'HTTP-Referer': 'http://localhost',
-      'X-Title': 'CLI Commit Writer',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Você é um especialista em gerar mensagens de commit seguindo o padrão brasileiro com emojis. Sempre use o emoji correto para cada tipo de commit. Seja preciso e objetivo.',
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.1,
-    }),
-  });
+  const systemPrompt = 'Você é um especialista em gerar mensagens de commit seguindo o padrão brasileiro com emojis. Sempre use o emoji correto para cada tipo de commit. Seja preciso e objetivo.';
+  
+  return await callAI(systemPrompt, prompt, 0.1);
+};
 
-  if (!response.ok) {
-    console.error(`Erro ao consultar IA: ${response.status} ${response.statusText}`);
-    exit(1);
-  }
-
-  const data = await response.json();
-  const message = data.choices?.[0]?.message?.content?.trim();
-
-  if (!message) {
-    console.error('Resposta vazia do modelo.');
+(async () => {
+  let message;
+  
+  try {
+    if (USE_TWO_STEP_PROCESSING) {
+      message = await processTwoStep(combinedDiff);
+    } else {
+      message = await processSingleStep(combinedDiff);
+    }
+  } catch (error) {
+    console.error(`Erro: ${error.message}`);
     exit(1);
   }
 

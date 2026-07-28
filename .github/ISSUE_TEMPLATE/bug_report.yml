@@ -1,0 +1,56 @@
+name: Relatar um problema
+description: Informe um comportamento incorreto do CLI
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Descrição
+      description: O que acontece e o que era esperado.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Como reproduzir
+      description: Passos, comando executado e estado do repositório.
+      placeholder: |
+        1. Em um repositório com alterações em X
+        2. Execute glum com estas opções
+        3. Observe o resultado
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Saída do terminal
+      description: Cole a saída completa. Remova a chave de API antes de enviar.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versão do pacote
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Modelo configurado
+      placeholder: openrouter/auto
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Node e sistema operacional
+      placeholder: Node 24 no Windows 11
+    validations:
+      required: true

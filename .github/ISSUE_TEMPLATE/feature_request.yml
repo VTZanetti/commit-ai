@@ -1,0 +1,31 @@
+name: Sugerir um recurso
+description: Proponha uma melhoria ou um novo comportamento
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema
+      description: Qual situação de uso não é bem atendida hoje.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposta
+      description: O comportamento desejado, incluindo opções de CLI ou variáveis de ambiente.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+      description: Outras formas de resolver o mesmo problema.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Informações adicionais
+      description: Exemplos, referências ou qualquer detalhe útil.

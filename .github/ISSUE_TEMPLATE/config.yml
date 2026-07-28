@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Dúvidas de uso
+    url: https://github.com/VTZanetti/glum-ai/discussions
+    about: Use as discussões para perguntas sobre configuração e uso.

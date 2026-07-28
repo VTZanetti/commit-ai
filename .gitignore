@@ -1,2 +1,60 @@
+# Dependencies
 node_modules/
+.pnp/
+.pnp.js
+
+# Package output
+*.tgz
+
+# Test and coverage
+coverage/
+.nyc_output/
+
+# Cache
+.eslintcache
+.cache/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
 .env
+.env.*
+!.env.example
+*.local
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# Operating system
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# AI assistants
+.claude/
+CLAUDE.md
+.claude.json
+.gemini/
+GEMINI.md
+.codex/
+AGENTS.md
+.kimi/
+KIMI.md
+.glm/
+GLM.md
+.cursor/
+.cursorrules
+.windsurf/
+.aider*
+.continue/
+.roo/
+.copilot/

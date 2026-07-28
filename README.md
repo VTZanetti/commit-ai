@@ -1,143 +1,111 @@
-# Pen Commit AI CLI
+<h1 align="center">Glum AI</h1>
 
-CLI para gerar mensagens de commit com IA (formato conventional commits) e aplicar automaticamente `git add`, `git commit` e `git push`.
+<p align="center">
+  CLI que lê as alterações do repositório e escreve a mensagem de commit no padrão Conventional Commits.
+</p>
 
-## Sumário
-- [Recursos](#recursos)
-- [Pré-requisitos](#pré-requisitos)
-- [Instalação](#instalação)
-- [Configuração das variáveis de ambiente](#configuração-das-variáveis-de-ambiente)
-- [Uso do commit assistido](#uso-do-commit-assistido)
-- [Utilização como CLI global](#utilização-como-cli-global)
-- [Scripts de desenvolvimento](#scripts-de-desenvolvimento)
-- [Contribuição](#contribuição)
-- [Licença](#licença)
+<p align="center">
+  <a href="https://github.com/VTZanetti/glum-ai/actions/workflows/ci.yml"><img src="https://github.com/VTZanetti/glum-ai/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/glum-ai"><img src="https://img.shields.io/npm/v/glum-ai" alt="npm"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT"></a>
+</p>
 
-## Recursos
-- Commit writer detecta arquivos staged, unstaged e untracked.
-- Suporte a confirmação para `git commit` e `git push`.
-- CLI exportado via campo `bin` para ser executado em qualquer projeto com Git.
-- **Processamento em 2 etapas** otimizado para APIs gratuitas com limite de tokens.
+## Diferenciais
 
-### Processamento em 2 etapas (otimizado para APIs gratuitas)
+A maioria dos geradores de commit envia o diff inteiro em uma requisição e devolve um texto genérico.
+O Glum AI faz três coisas além disso:
 
-Quando `USE_TWO_STEP_PROCESSING=true` (padrão), o commit-ai usa uma estratégia inteligente:
+- **Processamento em duas etapas.** Cada arquivo é resumido em uma requisição pequena e só depois os
+  resumos viram a mensagem final. Isso cabe nos limites de contas gratuitas e sobrevive à falha de um
+  arquivo isolado.
+- **Arquivos novos entram no contexto.** Arquivos ainda não rastreados não têm diff, então o CLI monta
+  um bloco sintético com o conteúdo deles antes de enviar.
+- **Saída limpa por construção.** O prompt proíbe emojis, travessões e qualquer menção a ferramentas,
+  e uma etapa de normalização remove o que o modelo insistir em incluir.
 
-**Etapa 1**: Resumir cada arquivo individualmente
-- Processa cada arquivo modificado separadamente
-- Gera um resumo curto de 1-2 linhas por arquivo
-- Reduz drasticamente o consumo de tokens por requisição
-- Ideal para APIs gratuitas com limites baixos
-
-**Etapa 2**: Combinar resumos
-- Pega todos os resumos individuais
-- Gera a mensagem de commit final baseada nos resumos
-- Mantém a qualidade mesmo com muitos arquivos
-
-**Benefícios**:
-- ✅ Consome menos tokens por requisição (várias pequenas vs uma grande)
-- ✅ Funciona bem com limites de APIs gratuitas
-- ✅ Mais resiliente: se um arquivo falhar, os outros continuam
-- ✅ Progresso visível durante o processamento
-
-**Modo tradicional** (`USE_TWO_STEP_PROCESSING=false`):
-- Envia todos os diffs de uma vez
-- Mais rápido, mas pode ultrapassar limites de tokens
-- Recomendado apenas para APIs pagas sem limites
-
-## Pré-requisitos
-- Node.js 18 ou superior.
-- Conta e API key do Open Router (`OPEN_ROUTER_API_KEY`).
+A única dependência de runtime é o `dotenv`.
 
 ## Instalação
 
 ```bash
-git clone https://github.com/VTZanetti/ia-test.git
-cd ia-test
+npm install -g glum-ai
+```
+
+Para usar direto do código fonte:
+
+```bash
+git clone https://github.com/VTZanetti/glum-ai.git
+cd glum-ai
 npm install
+npm link
 ```
 
-## Configuração das variáveis de ambiente
+## Configuração
 
-Crie um arquivo `.env` na raiz do repositório com:
-
-```
-OPEN_ROUTER_API_KEY=coloque_sua_chave_aqui
-OPEN_ROUTER_MODEL=openrouter/auto
-
-# Otimização para APIs gratuitas com limite de tokens
-USE_TWO_STEP_PROCESSING=true
-MAX_CHUNK_SIZE=8000
-MAX_FILE_CHARS=2000
-MAX_TOTAL_FILES=50
-MAX_DIFF_SIZE=100000
-```
-
-### Variáveis disponíveis
-
-- **OPEN_ROUTER_API_KEY** (obrigatório): Sua chave de API do Open Router
-- **OPEN_ROUTER_MODEL** (padrão: `openrouter/auto`): Modelo de IA a ser usado
-- **USE_TWO_STEP_PROCESSING** (padrão: `true`): Ativa processamento em 2 etapas
-  - `true`: Processa cada arquivo individualmente primeiro, depois combina (ideal para IAs gratuitas)
-  - `false`: Envia todos os diffs de uma vez (mais rápido, mas consome mais tokens)
-- **MAX_CHUNK_SIZE** (padrão: `8000`): Máximo de caracteres por arquivo ao resumir
-- **MAX_FILE_CHARS** (padrão: `2000`): Máximo de caracteres por arquivo novo
-- **MAX_TOTAL_FILES** (padrão: `50`): Máximo de arquivos novos a processar
-- **MAX_DIFF_SIZE** (padrão: `100000`): Tamanho máximo do diff total
-
-### Prioridade de carregamento
-O `commit-ai.js` procura as variáveis nesta ordem:
-1. `.env` localizado junto ao CLI (`/path/do/cli/.env`).
-2. `.env` do diretório em que o comando é executado.
-3. Caminho apontado em `OPEN_ROUTER_ENV_PATH` (valor absoluto).
-
-Use essa hierarquia para reutilizar a mesma chave em vários projetos sem duplicar arquivos.
-
-## Uso do commit assistido
+Crie um arquivo `.env` a partir do modelo e informe a chave de API:
 
 ```bash
-npm run commit:ai
+cp .env.example .env
 ```
 
-Fluxo:
-1. O script agrega `git diff --cached`, `git diff` e gera diffs sintéticos para arquivos `??` do `git status --short`.
-2. A IA devolve uma mensagem de commit no formato:
-   - Linha 1: `tipo(escopo): resumo`
-   - Linha 3+: até 3 bullets explicando mudanças.
-3. Você confirma se deseja aplicar a mensagem. Caso aceite:
-   - Executa `git add -A`.
-   - Cria o commit com a mensagem sugerida.
-4. Pergunta se deve rodar `git push`.
-5. Todas as confirmações aceitam `s`, `sim`, `y` ou `yes` (demais respostas são tratadas como `não`).
+```ini
+GLUM_API_KEY=coloque_sua_chave_aqui
+GLUM_MODEL=openrouter/auto
+```
 
-## Utilização como CLI global
+A referência completa das variáveis está em [docs/configuracao.md](./docs/configuracao.md).
 
-Graças ao campo `bin`, o comando pode ser executado em qualquer repositório Git:
+## Uso
 
-1. Faça o link global a partir deste projeto:
-   ```bash
-   npm link
-   ```
-2. Em outro repositório, basta rodar:
-   ```bash
-   commitai
-   ```
-   Certifique-se de que as variáveis de ambiente estejam acessíveis conforme explicado acima.
+Dentro de qualquer repositório git:
 
-Alternativamente, publique o pacote em um registro privado/público ou instale via caminho local:
 ```bash
-npm install -g /caminho/para/ia-test
+glum
 ```
 
-## Scripts de desenvolvimento
-- `npm run commit:ai`: executa o fluxo de commits assistidos localmente.
-- `commitai`: versão CLI global (requer `npm link` ou instalação global).
+O fluxo é sempre o mesmo:
 
-## Contribuição
-1. Faça um fork.
-2. Crie uma branch (`git checkout -b feature/nome`).
-3. Commit e push (`npm run commit:ai` pode ajudar a gerar a mensagem).
-4. Abra um pull request descrevendo o que foi alterado.
+1. O CLI reúne o diff staged, o diff do diretório de trabalho e os arquivos novos.
+2. O modelo escreve a mensagem, que é exibida no terminal.
+3. Você confirma o commit. Só então o CLI executa `git add -A` e `git commit`.
+4. Você confirma o push. Só então o CLI executa `git push`.
+
+Nenhuma alteração é aplicada sem confirmação, e o nome da branch atual aparece antes de cada etapa.
+
+## Opções
+
+| Opção             | Efeito                                             |
+| ----------------- | -------------------------------------------------- |
+| `-h`, `--help`    | Mostra a ajuda                                     |
+| `-v`, `--version` | Mostra a versão instalada                          |
+| `-y`, `--yes`     | Confirma o commit e o push sem perguntar           |
+| `-m`, `--model`   | Usa um modelo específico nesta execução            |
+| `--single-step`   | Envia o diff inteiro em uma única requisição       |
+| `--no-push`       | Nunca executa `git push`                           |
+| `--dry-run`       | Apenas exibe a mensagem, sem alterar o repositório |
+
+## Formato da mensagem
+
+As mensagens saem em inglês, no padrão [Conventional Commits](https://www.conventionalcommits.org/),
+sem emojis e sem qualquer marca de como foram escritas:
+
+```
+feat(git): collect untracked files into the diff
+
+- build a synthetic diff block for files git does not track yet
+- respect the file and character limits from the settings
+```
+
+## Documentação
+
+- [Guia de uso](./docs/uso.md)
+- [Referência de configuração](./docs/configuracao.md)
+- [Arquitetura](./docs/arquitetura.md)
+
+## Contribuindo
+
+Leia o [guia de contribuição](./CONTRIBUTING.md) antes de abrir um pull request.
 
 ## Licença
-ISC License.
+
+[MIT](./LICENSE) © Vitor Zanetti
